@@ -8,7 +8,7 @@
 > but as a **substrate** — assemblable, transmissible, and open to continuation.
 
 <!-- 主视觉图：上传到 images/ 后，把下面这行的路径改成你的图 -->
-![The Story Editor](images/hero.png)
+![The Story Editor](images/SE_General.jpg)
 
 ---
 
@@ -29,7 +29,7 @@ To represent uncertainty is, paradoxically, to make it certain — the moment an
 - **Parameters** — observable data carried by the network
 
 <!-- 工具界面 / 图解：替换成你的图 -->
-![The instrument](images/instrument.png)
+![The instrument](images/SE_Screenshot.png)
 
 ## Four Structural Features
 
@@ -38,9 +38,15 @@ To represent uncertainty is, paradoxically, to make it certain — the moment an
 - **Irreversibility** — Entropy accumulates as the network grows; choices cannot be undone, which is what makes them mean something.
 - **Parallel possibilities** — Branching subgraphs and a reboot mechanic make the plurality of futures something you can enter and compare, not just assert.
 
+<!-- 工具界面 / 图解：替换成你的图 -->
+![The instrument](images/Cosmic_Features.jpg)
+
 ## Demonstration — Rhône Glacier
 
 The method is demonstrated on the **Rhône Glacier**, chosen as a vehicle rather than a subject.
+
+<!-- 工具界面 / 图解：替换成你的图 -->
+![The instrument](images/Rhone_Demonstration.jpg)
 
 <!-- demo 视频封面：上传封面图到 images/，把链接换成你的 Vimeo/YouTube 地址 -->
 [![Watch the demo](images/demo-cover.png)](https://vimeo.com/你的视频链接)

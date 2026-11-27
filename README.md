@@ -53,5 +53,15 @@ The method is demonstrated on the **Rhône Glacier**, chosen as a vehicle rather
 
 ---
 
+## Second Prototype — Nootka Street (November 2026)
+
+After the thesis, the method was taken to a real planting design: the forest section of a concept design for Nootka Street, Vancouver. A simulation engine grows the design through 1,200 possible 50-year timelines per run. The designer then assembles each next run from **event**, **management** and **plant** modules, and every report says whether a problem belongs to one future or to the design itself.
+
+![Nootka Street section, year 40](nootka/images/section_year40.png)
+
+→ [Read more and run it](nootka/README.md) · [Stage report](nootka/docs/stage-report.md) · [Engine spec](nootka/docs/engine-spec.md)
+
+---
+
 **Qianqian Viola Zhao**
 *Master of Landscape Architecture · University of British Columbia*

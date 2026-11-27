@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nootka Street Simulation</title>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* One visual world on purpose (the Astral Lagoon palette of the Nootka drawings): navy ground, teal structure, mint for
+   what holds, amber for what is selected or needs attention. Flow: title -> run -> cloud of runs -> one class -> one timeline -> its report. */
+:root{
+  color-scheme:dark;
+  --navy:#00131E; --panel:#062430; --line:#0E4450; --teal:#4A9E9B; --mint:#A6CFC3; --paper:#F5F2F7; --warn:#F2B766; --muted:#9DBBBD;
+  --display:"Silkscreen","IBM Plex Mono",monospace; --body:"IBM Plex Sans","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--navy);color:var(--paper);font-family:var(--body);font-size:15px;line-height:1.55}
+.wrap{max-width:1320px;margin:0 auto;padding:20px 20px 60px}
+.screen{display:none} .screen.on{display:block}
+h1{font-family:var(--display);font-size:22px;margin:0 0 6px;color:var(--mint);letter-spacing:.5px;text-wrap:balance}
+h2{font-family:var(--display);font-size:14px;font-weight:400;letter-spacing:1px;color:var(--teal);text-transform:uppercase;margin:40px 0 12px}
+h3{font-size:15px;margin:0 0 4px;font-weight:600}
+p{margin:0 0 10px;max-width:72ch}
+button{font:inherit;color:var(--paper);background:#0A3340;border:1px solid var(--line);border-radius:4px;padding:6px 14px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--teal)} button:disabled{opacity:.45;cursor:default}
+button[aria-pressed=true]{background:var(--teal);color:var(--navy);border-color:var(--teal)}
+:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+.px{font-family:var(--display);font-size:13px}
+
+/* home */
+#home{min-height:78vh;display:none;flex-direction:column;justify-content:center;gap:22px;padding:40px 0}
+#home.on{display:flex}
+#home h1{font-size:clamp(26px,4.4vw,46px);line-height:1.15;max-width:18ch}
+#home p{color:#C9DADB;font-size:17px}
+.run{font-family:var(--display);font-size:20px;padding:14px 46px;background:var(--mint);color:var(--navy);border:0;align-self:flex-start;letter-spacing:1px}
+.run:hover:not(:disabled){background:var(--paper)}
+.facts{display:flex;gap:10px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:4px 10px;font-size:13px}
+.chip b{color:var(--mint);font-weight:600}
+
+/* running */
+.barbox{height:14px;border:1px solid var(--line);border-radius:3px;background:#041a23;overflow:hidden;max-width:640px}
+#bar{height:100%;width:0;background:var(--mint);transition:width .2s}
+#stage{font-family:var(--display);font-size:14px;color:var(--mint);margin:16px 0 8px}
+#err{border-left:3px solid var(--warn);padding:4px 0 4px 12px;color:#E6D5B8;display:none;margin-top:14px}
+
+/* top bar */
+.top{display:flex;gap:14px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:18px}
+.top .name{font-family:var(--display);color:var(--mint);font-size:13px}
+.crumbs{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13.5px;color:var(--muted)}
+.crumbs button{padding:3px 9px;font-size:13.5px}
+
+/* cloud */
+.two{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.two{grid-template-columns:1fr}}
+.cloud{width:100%;display:block;background:var(--panel);border:1px solid var(--line);border-radius:6px;cursor:crosshair}
+.cards{display:flex;flex-direction:column;gap:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;text-align:left;width:100%;display:block}
+button.card:hover:not(:disabled){border-color:var(--mint)}
+.card .n{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+.card .d{color:#C9DADB;font-size:13.5px}
+.card i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:7px;vertical-align:-1px}
+.card.on{border-color:var(--warn)}
+.hint{color:var(--muted);font-size:13px;margin:8px 0 0}
+dl.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:8px 0;font-size:13.5px}
+dl.kv dt{color:var(--muted)} dl.kv dd{margin:0;font-variant-numeric:tabular-nums}
+
+/* report */
+.years{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px;align-items:center}
+.years span{color:var(--muted);font-size:13px;margin-right:6px}
+.viewer{display:grid;grid-template-columns:minmax(0,0.9fr) minmax(0,1.6fr) minmax(250px,0.8fr);gap:14px;align-items:start}
+@media (max-width:1100px){.viewer{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)} .side{grid-column:1/-1}}
+@media (max-width:700px){.viewer{grid-template-columns:1fr}}
+.viewer img{width:100%;display:block;image-rendering:pixelated;background:#041a23;min-height:120px}
+.pick{position:relative;cursor:pointer;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.pick canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;pointer-events:none}
+.pick.busy::after{content:"DRAWING";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,19,30,.72);font-family:var(--display);color:var(--mint);letter-spacing:2px}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.side{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px}
+.sel{border:1px solid var(--warn);border-radius:4px;padding:10px 12px;margin-bottom:12px}
+select{font:inherit;color:var(--paper);background:#0A3340;border:1px solid var(--line);border-radius:4px;padding:4px 8px;width:100%;margin:4px 0 8px}
+.sel ol{margin:8px 0 0;padding:0;list-style:none;font-size:13px;color:#C9DADB}
+.sel ol b{color:var(--paper);font-weight:500;display:inline-block;min-width:58px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.tile{border:1px solid var(--line);border-radius:4px;padding:8px 10px}
+.tile b{display:block;font-size:22px;font-variant-numeric:tabular-nums;font-weight:600;line-height:1.2}
+.tile span{color:var(--muted);font-size:12.5px}
+.tests{display:flex;flex-direction:column;gap:5px;margin:6px 0 12px;padding:0;list-style:none}
+.tests li{display:grid;grid-template-columns:54px 1fr;gap:8px;font-size:13px;align-items:baseline}
+.pill{font-family:var(--display);font-size:11px;border-radius:3px;padding:2px 0;text-align:center}
+.ok{background:var(--mint);color:var(--navy)} .no{background:var(--warn);color:var(--navy)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px}
+.ans{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px}
+.ans .q{color:var(--muted);font-size:13px;margin-bottom:4px} .ans .a{font-size:17px;font-weight:600;margin-bottom:6px} .ans p{font-size:14px;color:#C9DADB;margin:0}
+figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px}
+figcaption{font-size:13px;color:#C9DADB;min-height:3.1em}
+svg{width:100%;height:auto;display:block}
+.bar{fill:var(--teal)} .axis{stroke:var(--line)} .me{stroke:var(--warn);stroke-width:2}
+.t{fill:var(--muted);font-size:10px;font-family:var(--body)} .tm{fill:var(--warn);font-size:10px;font-family:var(--body)}
+.rank{font-size:12.5px;color:var(--muted);margin:4px 0 0}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--line);padding:6px 10px 6px 0;white-space:nowrap}
+td{padding:5px 10px 5px 0;border-bottom:1px solid #0a3340;font-variant-numeric:tabular-nums}
+td.n,th.n{text-align:right}
+.st-good{color:var(--mint)} .st-stressed{color:var(--warn)} .st-gone{color:#8C9FA1}
+.split{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:24px} @media (max-width:900px){.split{grid-template-columns:1fr}}
+.notes li{margin-bottom:6px;color:#C9DADB;max-width:80ch}
+#tl text{font-family:var(--body);font-size:10px;fill:var(--muted)}
+/* assembly */
+.cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start} @media (max-width:1000px){.cols{grid-template-columns:1fr}}
+.mod{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px}
+.mod h3{font-family:var(--display);font-size:13px;font-weight:400;color:var(--mint);letter-spacing:1px;margin-bottom:4px}
+.mod .sub{color:var(--muted);font-size:13px;margin:0 0 12px}
+.blk{border:1px solid var(--line);border-radius:4px;padding:9px 11px;margin-bottom:8px;background:#041a23}
+.blk.changed{border-color:var(--warn)}
+.blk b{font-weight:600;font-size:14px} .blk p{font-size:12.5px;color:var(--muted);margin:2px 0 6px}
+.blk label{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;font-size:13px;color:#C9DADB;margin-top:4px}
+.blk select{width:auto;margin:0;max-width:190px;font-size:13px}
+.sw{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sw button{font-family:var(--display);font-size:11px;padding:4px 10px;min-width:54px}
+.sw button[aria-pressed=false]{background:#041a23;color:var(--warn);border-color:var(--warn)}
+.changes{margin:16px 0;padding:12px 14px;border-left:3px solid var(--warn);background:var(--panel)}
+.changes li{font-size:14px;color:#E6D5B8}
+.runbtn{font-family:var(--display);font-size:13px}
+.scope{display:inline-block;font-family:var(--display);font-size:10px;letter-spacing:.5px;border-radius:3px;padding:2px 7px;margin-bottom:6px}
+.scope.all{background:var(--warn);color:var(--navy)} .scope.one{background:#8CC0C6;color:var(--navy)} .scope.some{background:var(--line);color:var(--paper)}
+.lever{margin-top:8px;font-size:13px;color:var(--mint)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<section id="home" class="screen on">
+  <h1>Nootka Street Ecological Corridor Design Simulation</h1>
+  <p>The engine makes the open design choices itself, grows each design for 50 years through dry summers, heat, wind, snow, invasive plants and budget cuts, and shows what comes out. You pick the futures worth a closer look.</p>
+  <div class="facts" id="facts"></div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center"><button class="run" id="run">RUN</button><button id="see" class="px" style="display:none;padding:14px 22px;font-size:15px">SEE THE RESULTS</button></div>
+  <p class="hint" id="runhint">The simulation runs in this browser. Nothing is prepared in advance.</p>
+</section>
+
+<section id="assemble" class="screen">
+  <div class="top"><span class="name">NOOTKA STREET SIMULATION</span><div class="crumbs" id="crumbs3"></div></div>
+  <h1 id="atitle">ASSEMBLE THE NEXT RUN</h1>
+  <p style="color:#C9DADB">Run 0 had every event on and let the engine make every choice. Here you put in what you now know: switch event modules off, set how the site is managed, and fix the plants you have settled on. Anything you leave alone stays open.</p>
+  <div class="cols">
+    <div class="mod" id="m-events"><h3>EVENT MODULES</h3><p class="sub">What the world may do. Each is on or off for the whole run.</p><div id="a-events"></div></div>
+    <div class="mod" id="m-mgmt"><h3>MANAGEMENT MODULES</h3><p class="sub">What people decide. Set a choice, or leave it for the engine to try both ways.</p><div id="a-mgmt"></div></div>
+    <div class="mod" id="m-plants"><h3>PLANT MODULES</h3><p class="sub">Anchor what you have settled on. An anchored plant is the same in every design of the run; its fate still differs from future to future.</p><div id="a-plants"></div></div>
+  </div>
+  <div class="changes"><b id="chtitle"></b><ul id="chlist" style="margin:6px 0 0;padding-left:18px"></ul></div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center"><button class="run" id="run2">RUN</button><button id="reset" class="px" style="padding:12px 18px">CLEAR ALL CHANGES</button></div>
+</section>
+
+<section id="running" class="screen">
+  <h1>RUNNING THE SIMULATION: <span id="runname">RUN 0</span></h1>
+  <div id="stage">Starting the engine</div>
+  <div class="barbox"><div id="bar"></div></div>
+  <p class="hint" id="count">&nbsp;</p>
+  <div id="err"></div>
+  <canvas id="live" class="cloud" width="1100" height="460" style="margin-top:18px;cursor:default" aria-label="Runs appear here as they finish"></canvas>
+  <p class="hint">Each dot is one design in one future. They appear as they finish.</p>
+</section>
+
+<section id="results" class="screen">
+  <div class="top"><span class="name">NOOTKA STREET SIMULATION</span><div class="crumbs" id="crumbs"></div></div>
+  <div class="facts" id="runs" style="margin-bottom:14px"></div>
+  <h1 id="rtitle"></h1>
+  <div class="facts" id="setup" style="margin:0 0 10px"></div>
+  <p id="rlede" style="color:#C9DADB"></p>
+  <div class="two">
+    <div><canvas id="cloud" class="cloud" width="1100" height="640"></canvas><p class="hint" id="chint"></p></div>
+    <div class="cards" id="rcards"></div>
+  </div>
+</section>
+
+<section id="report" class="screen">
+  <div class="top"><span class="name">NOOTKA STREET SIMULATION</span><div class="crumbs" id="crumbs2"></div></div>
+  <h1 id="ptitle"></h1>
+  <p id="lede" style="color:#C9DADB"></p>
+  <div class="facts" id="design"></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px"><button id="anchorall" class="px">ANCHOR THE PLANTS OF THIS DESIGN</button><button id="toasm" class="px" style="display:none">GO TO THE NEXT RUN</button><span class="hint" id="anchormsg" style="margin:0"></span></div>
+
+  <h2>The site every ten years</h2>
+  <div class="years" id="years"><span>Year</span></div>
+  <div class="viewer">
+    <div class="col"><div class="pick" data-v="plan"><img id="plan" alt=""><canvas></canvas></div></div>
+    <div class="col"><div class="pick" data-v="section"><img id="section" alt=""><canvas></canvas></div><div class="pick" data-v="model"><img id="model" alt=""><canvas></canvas></div></div>
+    <div class="side"><div class="sel"><label for="pick" class="hint" style="margin:0">Click a tree or a shrub patch in any drawing, or choose one here</label>
+      <select id="pick"></select><div id="selinfo"></div><div id="selanchor"></div></div><div id="side"></div></div>
+  </div>
+
+  <h2>Answers to the six questions, for this timeline</h2>
+  <div class="grid" id="answers"></div>
+
+  <h2>The most critical issues for the next design</h2>
+  <p>Each issue says whether it belongs to this one future or shows up across the run, and which module could change it.</p>
+  <div class="grid" id="issues"></div>
+
+  <h2>Where this timeline sits among all runs</h2>
+  <p>Each chart counts every run of the round. The amber line is this timeline.</p>
+  <div class="grid" id="hists"></div>
+
+  <h2>What happened, year by year</h2>
+  <div class="scroll"><svg id="tl" viewBox="0 0 1040 214" style="min-width:760px"></svg></div>
+  <div class="scroll" style="margin-top:10px"><table id="deaths"></table></div>
+
+  <h2>Year 50 in detail</h2>
+  <div class="split">
+    <div class="scroll"><table id="trees"></table></div>
+    <div><div class="scroll"><table id="bysp"></table></div><div class="scroll" style="margin-top:18px"><table id="patches"></table></div></div>
+  </div>
+
+  <h2>How to read this</h2>
+  <ul class="notes">
+    <li>One timeline is one possible future of one design. It shows what can happen, not what will.</li>
+    <li>No yearly mortality rate is put into the model. Each year, each tree faces the causes of that year (unwatered dry summer, heat wave, second dry summer in a row, wind storm, shade, end of lifespan) and one draw decides whether it dies. The yearly mortality reported here is counted from the result. Causes that are not modelled (pests, disease, vandalism, planting failure) would add to it.</li>
+    <li>Glade management in this version removes the deciduous tree that shades the shrub patches most, every five years, whatever its size. Real glade management is not done this way. The rule is left as it is on purpose: it shows that this kind of decision needs the designer's judgement.</li>
+    <li>The bird results test habitat conditions (nest trees, cover, food, flowering months). They do not count birds.</li>
+    <li>A tree is marked stressed when it has grown clearly less than it could (dry summers, shade), was broken by snow in the last three years, or is past its expected life. These thresholds are judgement and still to be reviewed.</li>
+    <li>Trees that die are replanted the next year while the site is under active care, so a tree standing at year 50 may be younger than 50.</li>
+    <li>In the section, where the crown starts on the trunk is a fixed share for now. Buildings are drawn for context (3 m per storey) and do not yet shade the trees in the calculation.</li>
+    <li>All drawings use 0.5 m blocks. Ground and buildings in the block model use 1 m columns.</li>
+  </ul>
+</section>
+</div>
+
+<script>
+"use strict";
+const QS = new URLSearchParams(location.search), ND = +QS.get("nd") || 60, NF = +QS.get("nf") || 20, SEED = 1;
+const PYO = new URL("py/", location.href).href;        // the Python runtime is shipped with the page: nothing is fetched from another site
+const $ = id => document.getElementById(id), el = (t, h, c) => { const e = document.createElement(t); if (h !== undefined) e.innerHTML = h; if (c) e.className = c; return e; };
+const CC = ["#A6CFC3", "#4A9E9B", "#8CC0C6", "#F2B766"], SUBC = ["#A6CFC3", "#8CC0C6", "#E9B7C0", "#F2B766"];
+const screen = id => document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === id));
+[["Designs", ND], ["Futures for each", NF], ["Runs of 50 years", (ND * NF).toLocaleString()]].forEach(([k, v]) => $("facts").append(el("div", `${k}: <b>${v}</b>`, "chip")));
+
+let META, MI = {}, designs = [], pts = [], workers = [], bundle, main;       // main: the worker that also opens timelines and draws
+let runs = [], ri = -1, pending = null;                                      // every run keeps what was assembled for it
+const blank = () => ({locks: {}, mgmt: {}, events: {}});
+let draft = blank();
+const useRun = i => { ri = i; designs = runs[i].designs; pts = runs[i].pts; };
+const m = (p, k) => p.m[MI[k]];
+const cat = p => { const j = m(p, "jay") >= 0.7, h = m(p, "hum") >= 0.7; return j && h ? 0 : j ? 1 : h ? 2 : 3; };
+const jit = (i, s) => { let x = Math.sin(i * 12.9898 + s * 78.233) * 43758.5453; return x - Math.floor(x) - 0.5; };
+
+// ---------- run ----------
+let next = 0, done = 0, ready = 0, round = 0, started = false, drawReady = false;
+const give = w => { if (next < designs.length) { const di = next++; w.postMessage({t: "run", di, d: JSON.stringify(designs[di]), f0: 0, f1: NF}); } };
+function startRound() {                      // every run samples its own set of designs within what was assembled; the futures stay the same
+  round++; pending = {n: runs.length, setup: JSON.parse(JSON.stringify(draft)), designs: [], pts: []}; pts = pending.pts; designs = []; next = 0; done = 0; chosen = null;
+  $("bar").style.width = "0"; $("stage").textContent = "Choosing the designs"; $("runname").textContent = `RUN ${pending.n}`;
+  $("count").textContent = "\u00a0"; drawCloud($("live"), [], viewAll(), null); main.postMessage({t: "designs", n: ND, seed: SEED + pending.n, setup: JSON.stringify(pending.setup)});
+}
+function launch() { screen("running"); $("err").style.display = "none"; window.scrollTo(0, 0); if (main) startRound(); }
+$("run").onclick = async () => {
+  if (runs.length) return openAssembly();
+  screen("running"); $("run").disabled = true; $("err").style.display = "none";
+  if (started) return;
+  started = true;
+  try {
+    bundle = await (await fetch("bundle.json")).json();
+    const n = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1));
+    $("count").textContent = `Loading Python and the engine into ${n} worker${n > 1 ? "s" : ""}. The first time takes longest.`;
+    for (let i = 0; i < n; i++) {
+      const w = new Worker("worker.js"); workers.push(w);
+      w.onerror = e => fail("worker", (e.message || "the worker could not start") + (e.filename ? " (" + e.filename.split("/").pop() + ":" + e.lineno + ")" : ""));
+      w.onmessage = e => { const msg = e.data;
+        if (msg.t === "error") return fail(msg.at, msg.msg);
+        if (msg.t === "step") { if (!ready) $("stage").textContent = msg.s; return; }
+        if (msg.t === "ready") { ready++; w.isReady = true; if (!META) { META = JSON.parse(msg.meta); META.metrics.forEach((k, j) => MI[k] = j); main = w; startRound(); } else give(w); }
+        else if (msg.t === "designs") { designs = pending.designs = JSON.parse(msg.v); $("stage").textContent = "Running the designs"; workers.forEach(x => { if (x.isReady) give(x); }); }
+        else if (msg.t === "rows") { JSON.parse(msg.rows).forEach((row, fi) => pts.push({di: msg.di, fi, m: row})); done++;
+          $("bar").style.width = (done / ND * 100) + "%"; $("count").textContent = `${done} of ${ND} designs finished, ${pts.length.toLocaleString()} runs so far`;
+          drawCloud($("live"), pts, viewAll(), null);
+          if (done === ND) { $("stage").textContent = "Done"; if (!drawReady) { drawReady = true; main.postMessage({t: "draw_ready", font: bundle.font}); }
+            runs.push(pending); useRun(runs.length - 1); pending = null;
+            $("run").disabled = false; $("run").textContent = "ASSEMBLE THE NEXT RUN"; $("see").style.display = ""; $("runhint").textContent = `${runs.length} run${runs.length > 1 ? "s" : ""} finished. The next run is assembled from event, management and plant modules.`;
+            setTimeout(() => go({level: 0}), 500); } else give(w); }
+        else if (msg.t === "story") onStory(msg);
+        else if (msg.t === "drawn") onDrawn(msg);
+      };
+      w.postMessage({t: "init", pyo: PYO, bundle: {py: bundle.py, site: bundle.site}});
+    }
+    setTimeout(() => { if (!ready && $("err").style.display !== "block") { $("err").style.display = "block"; $("err").textContent = "Still starting after a minute. The last step reached is shown above; please send it to Claude."; } }, 60000);
+  } catch (e) { fail("start", String(e)); }
+};
+$("see").onclick = () => go({level: 0});
+$("run2").onclick = launch; $("reset").onclick = () => { draft = blank(); openAssembly(); };
+
+// ---------- assembling a run from modules ----------
+const EVENTS = [["dry", "Dry summers", "Unwatered trees and shrubs suffer; two in a row hurt cedar and spruce."], ["heat", "Heat waves", "Kill exposed young trees and cut flowering."],
+  ["wind", "Wind storms", "Blow down tall trees, most at the edges."], ["snow", "Heavy snow", "Breaks tops and branches."], ["ivy", "Invasive plants", "Arrive at the edges and spread over the ground."],
+  ["trample", "Trampling", "Wears the ground beside the path."], ["budget", "Budget cuts", "Years with no watering, replanting or clearing."]];
+const OPEN = "__open";
+const MGMT = [
+  ["Watering", "During establishment, and in dry summers later on.", [["water", "Years of establishment watering", [[OPEN, "engine tries 2 and 5"], [0, "none"], [2, "2 years"], [3, "3 years"], [5, "5 years"], [8, "8 years"]], "locks"],
+    ["water_dry", "Water established trees in dry summers", [[0, "no"], [1, "yes"]], "mgmt"]]],
+  ["Replanting", "What happens when a tree dies.", [["replant", "Lost trees are", [["same", "replanted, same species"], ["tolerant", "replanted, drought-hardier conifer"], ["none", "not replanted"]], "mgmt"]]],
+  ["Invasive plants", "How often they are cleared while the site is under care.", [["inv_every", "Cleared", [[1, "every year"], [3, "every 3 years"], [5, "every 5 years"], [0, "never"]], "mgmt"]]],
+  ["Glade management", "Keeping light on the shrub patches.", [["thin", "Glade management", [[OPEN, "engine tries with and without"], [0, "not done"], [1, "done"]], "locks"],
+    ["thin_method", "Method", [["remove", "remove the tree"], ["lift", "lift its crown, keep the tree"], ["small", "remove only trees up to 8 m"]], "mgmt"],
+    ["thin_start", "First done in year", [[5, "5"], [10, "10"], [15, "15"], [20, "20"]], "mgmt"], ["thin_every", "Then every", [[3, "3 years"], [5, "5 years"], [10, "10 years"]], "mgmt"]]],
+  ["Red alder", "A fast pioneer that shelters young conifers.", [["nurse", "Red alder planted first", [[OPEN, "engine tries with and without"], [0, "no, all planted together"], [1, "yes, conifers follow"]], "locks"],
+    ["alder_out", "Red alder taken out", [[0, "never, left to its lifespan"], [15, "in year 15"], [20, "in year 20"], [25, "in year 25"], [30, "in year 30"]], "mgmt"]]]];
+const dflt = k => META.defaults[k];
+function describe(st) {                      // plain list of what a run fixed, compared with run 0
+  const out = []; EVENTS.forEach(([k, n]) => { if (st.events[k] === false) out.push(`${n} switched off`); });
+  MGMT.forEach(([, , rows]) => rows.forEach(([k, lab, opts, where]) => { const v = st[where][k]; if (v === undefined) return; if (where === "mgmt" && String(v) === String(dflt(k))) return;
+    out.push(`${lab}: ${(opts.find(o => String(o[0]) === String(v)) || [0, v])[1]}`); }));
+  const an = Object.keys(META.candidates).filter(p => st.locks[p]), tot_ = Object.keys(META.candidates).length;
+  if (an.length > 5) { const c = {}; an.forEach(p => c[st.locks[p]] = (c[st.locks[p]] || 0) + 1); out.push(`${an.length} of ${tot_} open trees anchored: ${Object.entries(c).map(([s_, n_]) => `${n_} ${s_}`).join(", ")}`); }
+  else an.forEach(p => out.push(`${p} anchored as ${st.locks[p]}`));
+  if (st.locks.recipe) out.push(`Shrub recipe anchored: ${st.locks.recipe}`); if (st.locks.winter !== undefined) out.push(`Winter mahonia anchored: ${st.locks.winter ? "yes" : "no"}`);
+  return out;
+}
+function openAssembly(focus) {
+  screen("assemble"); window.scrollTo(0, 0); const n = runs.length; $("atitle").textContent = `ASSEMBLE RUN ${n}`; $("run2").textContent = `RUN ${n}`;
+  const cb = $("crumbs3"); cb.innerHTML = ""; const b0 = el("button", "Start"); b0.onclick = () => screen("home"); const b1 = el("button", "Results"); b1.onclick = () => go({level: 0}); cb.append(b0, el("span", "›"), b1, el("span", "›"), el("span", `Assemble run ${n}`));
+  const ev = $("a-events"); ev.innerHTML = ""; EVENTS.forEach(([k, name_, text]) => { const onv = draft.events[k] !== false, d = el("div", `<div class="sw"><b>${name_}</b><button aria-pressed="${onv}">${onv ? "ON" : "OFF"}</button></div><p style="margin-bottom:0">${text}</p>`, "blk" + (onv ? "" : " changed"));
+    d.querySelector("button").onclick = () => { if (onv) draft.events[k] = false; else delete draft.events[k]; openAssemblyKeep(); }; ev.append(d); });
+  const mg = $("a-mgmt"); mg.innerHTML = ""; MGMT.forEach(([title, text, rows]) => { const d = el("div", `<b>${title}</b><p>${text}</p>`, "blk"); let ch = false;
+    rows.forEach(([k, lab, opts, where]) => { const cur_ = draft[where][k] !== undefined ? draft[where][k] : (where === "locks" ? OPEN : dflt(k)); const l = el("label", `<span>${lab}</span>`), sl = el("select"); sl.id = "as-" + k;
+      opts.forEach(([v, t]) => sl.append(new Option(t, String(v)))); sl.value = String(cur_); if (where === "locks" ? cur_ !== OPEN : String(cur_) !== String(dflt(k))) ch = true;
+      sl.onchange = () => { const raw = sl.value, v = raw === OPEN ? undefined : (isNaN(+raw) ? raw : +raw); if (v === undefined || (where === "mgmt" && String(v) === String(dflt(k)))) delete draft[where][k]; else draft[where][k] = v; openAssemblyKeep(); };
+      l.append(sl); d.append(l); }); if (ch) d.classList.add("changed"); mg.append(d); });
+  const pl = $("a-plants"); pl.innerHTML = ""; const row = (title, key, opts, text) => { const cur_ = draft.locks[key] !== undefined ? draft.locks[key] : OPEN, d = el("div", `<label style="margin:0"><b>${title}</b></label>` + (text ? `<p style="margin-bottom:0">${text}</p>` : ""), "blk" + (cur_ !== OPEN ? " changed" : "")), sl = el("select"); sl.id = "as-" + key;
+    opts.forEach(([v, t]) => sl.append(new Option(t, String(v)))); sl.value = String(cur_); sl.onchange = () => { const raw = sl.value; if (raw === OPEN) delete draft.locks[key]; else draft.locks[key] = isNaN(+raw) ? raw : +raw; openAssemblyKeep(); }; d.querySelector("label").append(sl); pl.append(d); };
+  const short = x => x.replace("Western red ", "").replace("Sitka ", "").replace("Bigleaf ", "").replace("Red ", "").toLowerCase();
+  const nAn = Object.keys(META.candidates).filter(p => draft.locks[p]).length, tb = el("div", `<b>Trees</b><p>${nAn} of ${Object.keys(META.candidates).length} open plots anchored. Conifer plots may hold any of four conifers; tall deciduous plots bigleaf maple or red alder.</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px"></div>`, "blk" + (nAn ? " changed" : ""));
+  Object.entries(META.candidates).forEach(([p, c]) => { const sl = el("select"); sl.id = "as-" + p; sl.style.cssText = "max-width:none;width:100%;margin:0" + (draft.locks[p] ? ";border-color:var(--warn)" : ""); sl.setAttribute("aria-label", "Tree " + p);
+    sl.append(new Option(`${p}: open`, OPEN)); c.forEach(x => sl.append(new Option(`${p}: ${short(x)}`, x))); sl.value = draft.locks[p] || OPEN;
+    sl.onchange = () => { if (sl.value === OPEN) delete draft.locks[p]; else draft.locks[p] = sl.value; openAssemblyKeep(); }; tb.lastChild.append(sl); });
+  pl.append(tb);
+  row("Shrub recipe (all patches)", "recipe", [[OPEN, "open: engine tries all four"], ...META.recipes.map(x => [x, x])], "Even, berry-heavy, nectar-heavy or cover-heavy mix in every patch.");
+  row("Winter mahonia", "winter", [[OPEN, "open: with and without"], [1, "added to the patches"], [0, "not used"]], "A winter-flowering shrub for late-winter nectar.");
+  pl.append(el("p", "You can also anchor from a report: open a timeline, click a tree or a shrub patch, and choose Anchor.", "hint"));
+  const ch = describe(draft); $("chtitle").textContent = ch.length ? `Run ${n} differs from run 0 in ${ch.length} way${ch.length > 1 ? "s" : ""}` : `Nothing changed yet: run ${n} would repeat run 0 with a new set of designs`;
+  $("chlist").innerHTML = ch.map(c => `<li>${c}</li>`).join("");
+  if (focus && $(focus)) { $(focus).scrollIntoView({block: "center"}); $(focus).style.outline = "2px solid var(--warn)"; setTimeout(() => $(focus).style.outline = "", 2500); }
+}
+function openAssemblyKeep() { const y = window.scrollY; openAssembly(); window.scrollTo(0, y); }
+function fail(at, msg) { $("run").disabled = false; $("err").style.display = "block"; $("stage").textContent = "The run stopped";
+  $("err").textContent = `The engine could not ${at === "init" || at === "worker" || at === "start" ? "start in this browser" : "finish this step (" + at + ")"}. Detail: ${msg}`; }
+
+// ---------- point cloud ----------
+function viewAll() { return {x: p => m(p, "jay_n"), y: p => m(p, "hum_n"), xr: [0, 4], yr: [0, 4], xl: "Steller's jay: conditions met in an average year (of 4)", yl: "Anna's hummingbird: conditions met (of 4)",
+  col: p => CC[cat(p)], jx: 0.05, jy: 0.05}; }
+let hitPts = [];
+function drawCloud(cv, list, v, state) {
+  const g = cv.getContext("2d"), W = cv.width, H = cv.height, L = 74, R = 20, T = 18, B = 62; g.clearRect(0, 0, W, H);
+  const X = x => L + (x - v.xr[0]) / (v.xr[1] - v.xr[0]) * (W - L - R), Y = y => H - B - (y - v.yr[0]) / (v.yr[1] - v.yr[0]) * (H - T - B);
+  g.font = "15px IBM Plex Sans, sans-serif"; g.strokeStyle = "#0E4450"; g.fillStyle = "#9DBBBD"; g.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) { const xv = v.xr[0] + i / 4 * (v.xr[1] - v.xr[0]), yv = v.yr[0] + i / 4 * (v.yr[1] - v.yr[0]);
+    g.beginPath(); g.moveTo(X(xv), T); g.lineTo(X(xv), H - B); g.moveTo(L, Y(yv)); g.lineTo(W - R, Y(yv)); g.stroke();
+    g.textAlign = "center"; g.fillText(v.fmt ? v.fmt(xv, "x") : xv.toFixed(xv % 1 ? 1 : 0), X(xv), H - B + 18); g.textAlign = "right"; g.fillText(v.fmt ? v.fmt(yv, "y") : yv.toFixed(yv % 1 ? 1 : 0), L - 8, Y(yv) + 4); }
+  g.textAlign = "center"; g.fillStyle = "#C9DADB"; g.fillText(v.xl, L + (W - L - R) / 2, H - 14);
+  g.save(); g.translate(20, T + (H - T - B) / 2); g.rotate(-Math.PI / 2); g.fillText(v.yl, 0, 0); g.restore();
+  if (v.lines) { g.strokeStyle = "#F2B766"; g.setLineDash([5, 5]); g.beginPath(); g.moveTo(X(v.lines[0]), T); g.lineTo(X(v.lines[0]), H - B); g.moveTo(L, Y(v.lines[1])); g.lineTo(W - R, Y(v.lines[1])); g.stroke(); g.setLineDash([]); }
+  const sx = (v.xr[1] - v.xr[0]) * (v.jx || 0), sy = (v.yr[1] - v.yr[0]) * (v.jy || 0); hitPts = [];
+  list.forEach((p, i) => { const px = X(Math.min(v.xr[1], Math.max(v.xr[0], v.x(p) + jit(i, 1) * sx))), py = Y(Math.min(v.yr[1], Math.max(v.yr[0], v.y(p) + jit(i, 2) * sy)));
+    const dim = state && state.dim && state.dim(p), selp = state && state.sel === p;
+    g.globalAlpha = dim ? 0.12 : 0.8; g.fillStyle = v.col(p); g.beginPath(); g.arc(px, py, selp ? 7 : 3.4, 0, 6.3); g.fill();
+    if (selp) { g.globalAlpha = 1; g.strokeStyle = "#F5F2F7"; g.lineWidth = 2; g.stroke(); }
+    if (!dim) hitPts.push([px, py, p]); });
+  g.globalAlpha = 1;
+}
+function nearest(cv, e) { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * cv.width, y = (e.clientY - r.top) / r.height * cv.height; let best = null, bd = 14 * 14;
+  for (const [px, py, p] of hitPts) { const d = (px - x) ** 2 + (py - y) ** 2; if (d < bd) { bd = d; best = p; } } return best; }
+
+// ---------- results: all runs -> one class -> one timeline ----------
+let nav = {level: 0}, chosen = null;
+const CAT_TEXT = ["All conditions for both birds hold in most years", "Steller's jay conditions hold, hummingbird conditions do not", "Hummingbird conditions hold, Steller's jay conditions do not", "Neither bird has all its conditions in most years"];
+const SUB = ["Fuller canopy, more first trees kept", "Fuller canopy, fewer first trees kept", "Thinner canopy, more first trees kept", "Thinner canopy, fewer first trees kept"];
+const median = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+const name = p => `D${String(p.di).padStart(3, "0")}-F${String(p.fi).padStart(2, "0")}`;
+function crumbs(box) { box.innerHTML = ""; const add = (t, fn) => { const b = el("button", t); b.onclick = fn; box.append(b, el("span", "›")); };
+  add("Start", () => screen("home")); if (nav.level >= 0) add(`Run ${runs[ri].n}`, () => go({level: 0}));
+  if (nav.level >= 1) add(META.cats[nav.c][0].toUpperCase() + META.cats[nav.c].slice(1), () => go({level: 1, c: nav.c, sub: null}));
+  if (nav.sub != null && nav.level >= 1) add(SUB[nav.sub], () => go({level: 1, c: nav.c, sub: nav.sub}));
+  box.lastChild.remove(); }
+function runStrip() { const box = $("runs"); box.innerHTML = "";
+  runs.forEach((r, i) => { const sh = [0, 1, 2, 3].map(c => r.pts.filter(p => cat(p) === c).length / r.pts.length * 100), b = el("button", `RUN ${r.n}<span style="display:inline-flex;width:60px;height:8px;margin-left:8px;vertical-align:middle;border-radius:2px;overflow:hidden">${sh.map((v, c) => `<i style="width:${v}%;background:${CC[c]};display:block"></i>`).join("")}</span>`, "runbtn");
+    b.setAttribute("aria-pressed", i === ri); b.title = describe(r.setup).join("; ") || "Everything on, engine chooses"; b.onclick = () => { useRun(i); go({level: 0}); }; box.append(b); });
+  const nb = el("button", `ASSEMBLE RUN ${runs.length}`, "runbtn"); nb.style.cssText = "background:var(--mint);color:var(--navy);border:0"; nb.onclick = () => openAssembly(); box.append(nb);
+  const ch = describe(runs[ri].setup); $("setup").innerHTML = ""; (ch.length ? ch : ["Every event on", "The engine makes every choice"]).forEach(c => $("setup").append(el("div", c, "chip")));
+}
+function go(n) {
+  nav = n; chosen = n.keep ? chosen : null; screen("results"); crumbs($("crumbs")); runStrip(); const box = $("rcards"); box.innerHTML = ""; const cv = $("cloud");
+  if (n.level === 0) {
+    $("rtitle").textContent = `RUN ${runs[ri].n}: ALL TIMELINES`; $("rlede").textContent = `${pts.length.toLocaleString()} timelines: ${ND} designs, each met with the same ${NF} futures. A run is placed in a class by which birds have all their habitat conditions in at least 70% of years 20 to 50. Choose a class to look inside.`;
+    $("chint").textContent = "Each dot is one run. Dots are spread slightly so they do not sit on top of each other.";
+    drawCloud(cv, pts, viewAll(), null);
+    META.cats.forEach((c, i) => { const k = pts.filter(p => cat(p) === i).length; const b = el("button", `<div><i style="background:${CC[i]}"></i><b>${c[0].toUpperCase() + c.slice(1)}</b></div><div class="n">${k.toLocaleString()} <span style="font-size:14px;color:var(--muted);font-weight:400">runs, ${(k / pts.length * 100).toFixed(0)}%</span></div><div class="d">${CAT_TEXT[i]}</div>`, "card");
+      b.disabled = !k; b.onclick = () => go({level: 1, c: i, sub: null}); box.append(b); });
+    cv.onclick = e => { const p = nearest(cv, e); if (p) go({level: 1, c: cat(p), sub: null}); };
+    return;
+  }
+  const list = pts.filter(p => cat(p) === n.c), cx = median(list.map(p => m(p, "canopy50"))), fy = median(list.map(p => m(p, "first50")));
+  const sub = p => (m(p, "canopy50") >= cx ? 0 : 2) + (m(p, "first50") >= fy ? 0 : 1), T = META.trees;
+  const xs = list.map(p => m(p, "canopy50") * 100), ys = list.map(p => m(p, "first50") * T);
+  const v = {x: p => m(p, "canopy50") * 100, y: p => m(p, "first50") * T, xr: [Math.floor(Math.min(...xs) / 5) * 5, Math.ceil(Math.max(...xs) / 5) * 5 + 1e-9], yr: [Math.max(0, Math.floor(Math.min(...ys)) - 1), Math.min(T, Math.ceil(Math.max(...ys)) + 1)],
+    xl: "Canopy cover of the green area at year 50 (%)", yl: `First-planted trees alive at year 50 (of ${T})`, col: p => SUBC[sub(p)], jx: 0, jy: 0.012, lines: [cx * 100, fy * T], fmt: q => q.toFixed(0)};
+  $("rtitle").textContent = META.cats[n.c].toUpperCase(); $("rlede").textContent = `${list.length.toLocaleString()} runs in this class, split in four by the middle value of canopy cover and of first-planted trees kept (dashed lines). Choose a group to focus on it, then click a dot to pick one timeline.`;
+  $("chint").textContent = n.sub == null ? "Click a dot to pick a timeline." : "Only this group can be picked. Click the group again to see all four.";
+  const state = {dim: p => n.sub != null && sub(p) !== n.sub, sel: chosen}; drawCloud(cv, list, v, state);
+  SUB.forEach((t, i) => { const k = list.filter(p => sub(p) === i).length; const b = el("button", `<div><i style="background:${SUBC[i]}"></i><b>${t}</b></div><div class="d">${k.toLocaleString()} runs</div>`, "card" + (n.sub === i ? " on" : ""));
+    b.disabled = !k; b.onclick = () => go({level: 1, c: n.c, sub: n.sub === i ? null : i}); box.append(b); });
+  const pick = el("div", "", "card on"); box.append(pick);
+  const showPick = () => { if (!chosen) { pick.innerHTML = `<b>No timeline picked</b><div class="d">Click a dot in the cloud.</div>`; return; } const d = designs[chosen.di];
+    pick.innerHTML = `<b>Timeline ${name(chosen)}</b><dl class="kv"><dt>Canopy at year 50</dt><dd>${(m(chosen, "canopy50") * 100).toFixed(0)}%</dd><dt>First trees alive</dt><dd>${Math.round(m(chosen, "first50") * T)} of ${T}</dd>
+      <dt>Jay conditions</dt><dd>${m(chosen, "jay_n").toFixed(1)} of 4</dd><dt>Hummingbird conditions</dt><dd>${m(chosen, "hum_n").toFixed(1)} of 4</dd><dt>Yearly mortality</dt><dd>${(m(chosen, "annual_mort") * 100).toFixed(2)}%</dd></dl>`;
+    const b = el("button", "OPEN THE REPORT", "px"); b.style.cssText = "background:var(--mint);color:var(--navy);border:0;padding:8px 16px"; b.onclick = () => openStory(chosen); pick.append(b); };
+  showPick();
+  cv.onclick = e => { const p = nearest(cv, e); if (p) { chosen = p; drawCloud(cv, list, v, {dim: state.dim, sel: p}); showPick(); } };
+}
+
+// ---------- report for one timeline ----------
+let D = null, cur = 50, sel = 0, key = "", imgs = {}, maps = {};
+function openStory(p) { key = name(p); D = null; imgs = {}; maps = {}; sel = 0; screen("report"); window.scrollTo(0, 0);
+  $("ptitle").textContent = `TIMELINE ${key}`; $("lede").textContent = "Opening the timeline."; nav.keep = true; crumbs($("crumbs2"));
+  $("crumbs2").append(el("span", "›"), el("span", key));
+  ["plan", "section", "model"].forEach(v => $(v).removeAttribute("src"));
+  main.postMessage({t: "story", key, d: JSON.stringify(designs[p.di]), seed: p.fi}); D0 = p; }
+let D0 = null;
+function onStory(msg) { if (msg.key !== key) return; D = JSON.parse(msg.data); renderReport(); show(50); }
+function onDrawn(msg) { if (msg.key !== key) return; const o = {}; for (const [k, buf] of Object.entries(msg.files)) o[k] = URL.createObjectURL(new Blob([buf], {type: "image/png"})); imgs[msg.year] = o; if (cur === msg.year) show(cur); }
+function show(y) {
+  cur = y; [...$("years").querySelectorAll("button")].forEach(b => b.setAttribute("aria-pressed", +b.dataset.y === y));
+  const have = imgs[y]; document.querySelectorAll(".pick").forEach(b => b.classList.toggle("busy", !have));
+  if (have) { for (const v of ["plan", "section", "model"]) { $(v).src = have[v]; $(v).alt = `${v} of the site at year ${y}`; } }
+  else if (imgs[y] !== null) { imgs[y] = null; main.postMessage({t: "draw", key, year: y, title: "timeline " + key}); }
+  if (!D) return; const d = D.decades.find(q => q.year === y), ev = d.events;
+  const evs = [["dry", "dry summers"], ["heat", "heat waves"], ["wind", "wind storms"], ["snow", "heavy snow years"], ["budget_cut", "years without care"]].map(([k, n]) => `${ev[k]} ${n}`).join(", ");
+  const tests = Object.entries(d.tests).map(([k, ok]) => `<li><span class="pill ${ok ? "ok" : "no"}">${ok ? "MET" : "NOT MET"}</span><span>${D.test_label[k]}</span></li>`);
+  $("side").innerHTML = `<h3>Year ${y}</h3><div class="tiles">
+      <div class="tile"><b>${d.alive} / ${D.trees50.length}</b><span>trees standing</span></div><div class="tile"><b>${d.stressed}</b><span>of them stressed</span></div>
+      <div class="tile"><b>${d.died}</b><span>trees lost so far</span></div><div class="tile"><b>${d.canopy}%</b><span>canopy cover of green area</span></div>
+      <div class="tile"><b>${d.three}%</b><span>green area with all three layers</span></div><div class="tile"><b>${d.shrub}%</b><span>shrub patch cover</span></div>
+      <div class="tile"><b>${d.tallest} m</b><span>tallest tree</span></div><div class="tile"><b>${d.invaded}%</b><span>green area under invasive plants</span></div></div>
+    <h3>Steller's jay</h3><ul class="tests">${tests.slice(0, 4).join("")}</ul><h3>Anna's hummingbird</h3><ul class="tests">${tests.slice(4).join("")}</ul>
+    <h3>${y === 1 ? "This year" : "The ten years before"}</h3><p style="font-size:13.5px;color:#C9DADB;margin:0">${evs}.</p>`;
+  drawSel();
+}
+function idmap(v, y) { const k = v + y; if (maps[k]) return maps[k]; if (!imgs[y]) return Promise.resolve(null);
+  return maps[k] = new Promise(res => { const im = new Image(); im.onload = () => { const c = document.createElement("canvas"); c.width = im.width; c.height = im.height;
+    const g = c.getContext("2d", {willReadFrequently: true}); g.drawImage(im, 0, 0); res({w: im.width, h: im.height, d: g.getImageData(0, 0, im.width, im.height).data}); }; im.onerror = () => res(null); im.src = imgs[y][v + "_id"]; }); }
+function drawSel() {
+  document.querySelectorAll(".pick").forEach(async box => { const y = cur, mp = await idmap(box.dataset.v, y), cv = box.querySelector("canvas"); if (!mp || y !== cur) { cv.width = cv.width; return; }
+    cv.width = mp.w; cv.height = mp.h; const g = cv.getContext("2d"), out = g.createImageData(mp.w, mp.h);
+    if (sel) for (let i = 0; i < mp.w * mp.h; i++) if (mp.d[i * 4] === sel) { const x = i % mp.w, yy = (i / mp.w) | 0;
+      const edge = x === 0 || yy === 0 || x === mp.w - 1 || yy === mp.h - 1 || mp.d[(i - 1) * 4] !== sel || mp.d[(i + 1) * 4] !== sel || mp.d[(i - mp.w) * 4] !== sel || mp.d[(i + mp.w) * 4] !== sel;
+      out.data.set(edge ? [255, 244, 214, 255] : [242, 183, 102, 110], i * 4); }
+    g.putImageData(out, 0, 0); });
+  info();
+}
+function info() { const box = $("selinfo"); if (!sel || !D) { box.innerHTML = ""; $("selanchor").innerHTML = ""; return; } const fr = D.frames[cur];
+  if (sel > 100) { const i = sel - 101, p = D.patches[i], q = fr.patches[i]; setTimeout(anchorBox, 0);
+    box.innerHTML = `<h3>Shrub patch ${p.id}, year ${cur}</h3><dl class="kv"><dt>Area</dt><dd>${p.area} m²</dd><dt>Shrub cover</dt><dd>${q.cover}%</dd><dt>Tree canopy above</dt><dd>${q.canopy}%</dd><dt>Invasive plants</dt><dd>${q.inv}%</dd></dl><ol>${D.mix.map(([k, v]) => `<li><b>${v}%</b>${k}</li>`).join("")}</ol>`; return; }
+  const i = sel - 1, t = fr.trees[i], id = D.tree_ids[i], log = D.logs[id].filter(e => e[0] <= cur);
+  const st = t.health ? `<dt>Height</dt><dd>${t.h} m</dd><dt>Crown width</dt><dd>${t.w} m</dd><dt>Age</dt><dd>${t.age} years</dd><dt>Health</dt><dd class="${t.health === 2 ? "st-good" : "st-stressed"}">${t.health === 2 ? "good" : "stressed"}</dd>` : `<dt>State</dt><dd class="st-gone">not standing this year</dd>`;
+  box.innerHTML = `<h3>${id}, year ${cur}</h3><dl class="kv"><dt>Species</dt><dd>${t.sp}</dd>${st}</dl><ol>${log.map(e => `<li><b>year ${e[0]}</b>${e[1]}</li>`).join("") || "<li>Not planted yet.</li>"}</ol>`;
+  anchorBox(); }
+function anchored(msg) { $("anchormsg").textContent = msg; $("toasm").style.display = ""; $("toasm").textContent = `GO TO RUN ${runs.length}`; anchorBox(); }
+function anchorBox() { const box = $("selanchor"); box.innerHTML = ""; if (!sel || !D) return; let key_, val, label;
+  if (sel > 100) { key_ = "recipe"; val = D.design.recipe; label = `the ${val} shrub recipe`; }
+  else { const id = D.tree_ids[sel - 1]; if (!META.candidates[id]) { box.append(el("p", `${id} is already fixed: ${D.trees50[sel - 1].species} is the only small tree in the planting palette, so there is nothing to anchor here.`, "hint")); return; } key_ = id; val = D.design.plots[id]; label = `${val} at ${id}`; }
+  const has = draft.locks[key_] === val, b = el("button", has ? `ANCHORED: ${label.toUpperCase()}` : `ANCHOR ${label.toUpperCase()}`, "px"); b.style.marginTop = "8px"; b.setAttribute("aria-pressed", has);
+  b.onclick = () => { if (has) { delete draft.locks[key_]; anchored(`Anchor removed.`); } else { draft.locks[key_] = val; anchored(`Anchored ${label} for run ${runs.length}.`); } };
+  box.append(b, el("p", "Anchoring fixes the design choice for the next run. What happens to it still depends on the future.", "hint")); }
+function select(id) { sel = id; $("pick").value = String(id); drawSel(); }
+$("pick").onchange = () => select(+$("pick").value);
+$("toasm").onclick = () => openAssembly("m-plants");
+$("anchorall").onclick = () => { if (!D) return; Object.entries(D.design.plots).forEach(([p_, sp_]) => draft.locks[p_] = sp_); draft.locks.recipe = D.design.recipe; draft.locks.winter = D.design.winter;
+  anchored(`Anchored all open trees, the shrub recipe and the winter mahonia choice of this design for run ${runs.length}.`); };
+document.querySelectorAll(".pick").forEach(box => box.addEventListener("click", async e => { const mp = await idmap(box.dataset.v, cur); if (!mp) return;
+  const r = box.getBoundingClientRect(), x = Math.floor((e.clientX - r.left) / r.width * mp.w), y = Math.floor((e.clientY - r.top) / r.height * mp.h);
+  let hit = 0; for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) { const X = x + dx, Y = y + dy; if (X >= 0 && Y >= 0 && X < mp.w && Y < mp.h && mp.d[(Y * mp.w + X) * 4]) { hit = mp.d[(Y * mp.w + X) * 4]; break; } }
+  select(hit === sel ? 0 : hit); }));
+document.addEventListener("keydown", e => { if (!$("report").classList.contains("on") || !D || e.target.tagName === "SELECT") return; const ys = D.decades.map(d => d.year), i = ys.indexOf(cur);
+  if (e.key === "ArrowRight" && i < ys.length - 1) show(ys[i + 1]); if (e.key === "ArrowLeft" && i > 0) show(ys[i - 1]); });
+
+// ---------- the most critical issues: what, how widespread, and which module could change it ----------
+const LEVER = {J1: ["m-plants", "Plant modules: which conifers stand at the open plots. Management: watering and replanting keep them alive long enough to reach 8 m."],
+  J2: ["m-mgmt", "Management: glade management opens the canopy, so how and when it is done decides the cover around nest trees."],
+  J3: ["", ""], J4: ["m-plants", "Plant modules: anchor the berry recipe in the shrub patches."], H1: ["m-plants", "Plant modules: the shrub recipe and winter mahonia decide how many months have flowers."],
+  H2: ["m-plants", "Plant modules: winter mahonia is the late-winter nectar source."], H3: ["m-plants", "Plant modules: shrub recipe; vine maple near the patches."],
+  H4: ["m-mgmt", "Management: glade management keeps part of the green area open. Plant modules: fewer large crowns over the patches."]};
+const CAUSE = {"dry summer": ["d_dry", "m-mgmt", "Management: more years of establishment watering, or watering established trees in dry summers."],
+  "second dry summer in a row": ["d_dry2", "m-mgmt", "Management: watering established trees in dry summers. Plant modules: Douglas-fir in place of cedar at the open plots; drought-hardier replanting."],
+  "heat wave": ["d_heat", "m-mgmt", "Management: red alder planted first shelters the young conifers."], "wind storm": ["d_wind", "m-plants", "Plant modules: wind-firm species at the open plots. Management: removing trees (glade, red alder) leaves the rest more exposed."],
+  "end of lifespan": ["d_age", "m-mgmt", "Management: take the red alder out in a chosen year, before it dies standing."], "shade": ["d_shade", "m-plants", "Plant modules: a shade-tolerant species at that plot."]};
+function issues() {
+  const out = [], share = f => pts.filter(f).length / pts.length, tag = a => a >= 0.8 ? ["all", `IN ${Math.round(a * 100)}% OF TIMELINES`, "This is not about this future. It shows up almost whatever the design and the weather."] :
+    a <= 0.3 ? ["one", `MOSTLY THIS FUTURE: ${Math.round(a * 100)}% OF TIMELINES`, "Most timelines of the run do not have this problem."] : ["some", `IN ${Math.round(a * 100)}% OF TIMELINES`, "Some designs and futures have it and some do not, so a design change may move it."];
+  Object.keys(D.test_label).forEach(k => { const here = D.metrics[k]; if (here >= 0.7) return; const across = share(p => m(p, k) < 0.7), [cl, lab, note] = tag(across), bird = k[0] === "J" ? "Steller's jay" : "Anna's hummingbird";
+    let lever = LEVER[k][1], focus = LEVER[k][0];
+    if (k === "J3") { const mx = Math.max(...pts.map(p => m(p, "three50"))) * 100; lever = `No module moves this enough: the best timeline of the run reaches ${mx.toFixed(0)}% against a target of 40%. The target, or how the three layers are counted, needs review before the design does.`; }
+    out.push({score: (0.7 - here) * (1 + across) + 1, cl, lab, focus, title: `${bird}: ${D.test_label[k]}`, text: `Met in ${Math.round(here * 100)}% of years 20 to 50 here. ${note}`, lever}); });
+  const why = {}; D.deaths.forEach(x => why[x.why] = (why[x.why] || 0) + 1); const top = Object.entries(why).sort((a, b) => b[1] - a[1])[0];
+  if (top && top[1] >= 3) { const [mk, focus, lever] = CAUSE[top[0]], causes = Object.values(CAUSE).map(c => c[0]), across = share(p => m(p, mk) > 0 && causes.every(c => m(p, c) <= m(p, mk))), [cl, lab, note] = tag(across);
+    out.push({score: 0.6 + top[1] / 20 + across / 2, cl, lab: lab.replace("TIMELINES", "TIMELINES IT IS THE MAIN CAUSE"), focus, title: `Main cause of tree loss: ${top[0]} (${top[1]} of ${D.deaths.length} trees)`, text: `Across the run a timeline loses ${median(pts.map(p => m(p, mk))).toFixed(0)} trees to it in the middle case.`, lever}); }
+  const rep_ = D.trees50.filter(t => t.fails >= 2); if (rep_.length) out.push({score: 0.5 + rep_.length / 10, cl: "one", lab: "SEEN IN THIS TIMELINE", focus: "m-plants", title: `Plots where trees keep failing: ${rep_.map(t => `${t.id} (${t.fails} times)`).join(", ")}`,
+    text: "The same plot lost its tree more than once. Open other timelines of the same design to see if it repeats.", lever: "Management: drought-hardier replanting. Plant modules: a different species at that plot, where the plot is an open choice."});
+  const shaded = D.trees50.filter(t => t.health === "stressed" && t.shade >= 0.5); if (shaded.length) out.push({score: 0.4 + shaded.length / 10, cl: "one", lab: "SEEN IN THIS TIMELINE", focus: "m-plants", title: `Stressed under a larger neighbour at year 50: ${shaded.map(t => `${t.id} under ${t.shader}`).join(", ")}`,
+    text: "These trees stand in the shade of a taller crown and have grown clearly less than they could.", lever: "Plant modules: a shade-tolerant species there, or a smaller neighbour. Management: lifting the neighbour's crown."});
+  const big = D.removed.filter(q => q.h >= 12); if (big.length) out.push({score: 0.9 + big.length / 10, cl: "some", lab: "A MANAGEMENT SIDE EFFECT", focus: "m-mgmt", title: `Management removed large trees: ${big.map(q => `${q.id}, a ${q.h} m ${q.species.toLowerCase()}, in year ${q.year}`).join("; ")}`,
+    text: "Removing a tree this size costs decades of growth and canopy, and leaves its neighbours more exposed to wind.", lever: "Management: start glade management earlier, lift crowns instead of removing, or limit removal to small trees."});
+  return out.sort((a, b) => b.score - a.score).slice(0, 5);
+}
+function renderIssues() { const box = $("issues"); box.innerHTML = ""; const list = issues(); if (!list.length) { box.append(el("div", `<div class="a">No critical issue found in this timeline</div><p>All habitat conditions hold in most years and no large loss stands out.</p>`, "ans")); return; }
+  list.forEach((q, i) => { const d = el("div", `<span class="scope ${q.cl}">${q.lab}</span><div class="a">${i + 1}. ${q.title}</div><p>${q.text}</p><div class="lever">${q.lever}</div>`, "ans");
+    if (q.focus) { const b = el("button", "CHANGE IT IN THE NEXT RUN", "px"); b.style.marginTop = "10px"; b.onclick = () => openAssembly(q.focus); d.append(b); } box.append(d); }); }
+function hist(vals, me, title, pct, lo, hi) { const k = pct ? 100 : 1, v = vals.map(q => q * k); me *= k; const small = Math.max(...v) < 5, fm = q => q.toFixed(small ? 1 : 0), u = pct ? "%" : "";
+  lo = lo ?? Math.floor(Math.min(...v)); hi = Math.max(hi ?? Math.ceil(Math.max(...v)), lo + 1); const n = new Array(24).fill(0); v.forEach(q => n[Math.min(23, Math.max(0, Math.floor((q - lo) / (hi - lo) * 24)))]++);
+  const W = 300, H = 120, L = 8, Bm = 22, bw = (W - 2 * L) / 24, mx = Math.max(...n, 1), xm = L + (me - lo) / (hi - lo) * (W - 2 * L), rank = v.filter(q => q <= me).length / v.length * 100;
+  return `<figure><figcaption>${title}</figcaption><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}: this timeline ${fm(me)}${u}">${n.map((c, i) => `<rect x="${(L + i * bw).toFixed(1)}" y="${(H - Bm - c / mx * (H - Bm - 14)).toFixed(1)}" width="${(bw - 1).toFixed(1)}" height="${(c / mx * (H - Bm - 14)).toFixed(1)}" class="bar"/>`).join("")}
+    <line x1="${L}" x2="${W - L}" y1="${H - Bm}" y2="${H - Bm}" class="axis"/><line x1="${xm.toFixed(1)}" x2="${xm.toFixed(1)}" y1="6" y2="${H - Bm}" class="me"/><text x="${L}" y="${H - 6}" class="t">${fm(lo)}${u}</text><text x="${W - L}" y="${H - 6}" class="t" text-anchor="end">${fm(hi)}${u}</text>
+    <text x="${Math.min(Math.max(xm, 70), W - 70).toFixed(1)}" y="${H - 6}" class="tm" text-anchor="middle">this one: ${fm(me)}${u}</text></svg><p class="rank">Higher than ${rank.toFixed(0)}% of the ${v.length.toLocaleString()} runs.</p></figure>`; }
+const tbl = (id, head, body) => $(id).innerHTML = `<thead><tr>${head.map(h => `<th${h[1] ? ' class="n"' : ""}>${h[0]}</th>`).join("")}</tr></thead><tbody>${body.join("")}</tbody>`;
+const yn = v => v ? "yes" : "no";
+function renderReport() {
+  $("anchormsg").textContent = ""; $("toasm").style.display = Object.keys(draft.locks).length ? "" : "none"; $("toasm").textContent = `GO TO RUN ${runs.length}`;
+  $("lede").textContent = `Timeline ${key} is one of the ${pts.length.toLocaleString()} timelines of run ${runs[ri].n}: design ${D0.di + 1} of ${ND} in future ${D0.fi + 1} of ${NF}. The engine chose the design; the future is 50 years of growth with random dry summers, heat, wind, snow, invasive plants and budget cuts.`;
+  const cnt = {}; Object.values(D.design.plots).forEach(s => cnt[s] = (cnt[s] || 0) + 1);
+  const plots = Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([s, n]) => `${n} ${s}`).join(", "); $("design").innerHTML = "";
+  [[`Trees the engine chose (${Object.keys(D.design.plots).length} open plots)`, plots], ["Shrub recipe", D.design.recipe], ["Winter mahonia", yn(D.design.winter)], ["Red alder first", D.design.nurse ? `yes, conifers planted in year ${D.nurse_delay}` : "no, all planted together"],
+   ["Glade management", yn(D.design.thin)], ["Watering", D.design.water + " years"]].forEach(([k, v]) => $("design").append(el("div", `${k}: <b>${v}</b>`, "chip")));
+  describe({locks: {}, mgmt: D.design.mgmt || {}, events: D.design.events || {}}).forEach(c => $("design").append(el("div", c, "chip")));
+  renderIssues();
+  $("years").innerHTML = "<span>Year</span>"; D.decades.forEach(d => { const b = el("button", String(d.year), "px"); b.dataset.y = d.year; b.onclick = () => show(d.year); $("years").append(b); });
+  $("pick").innerHTML = ""; $("pick").append(new Option("Nothing selected", "0")); D.tree_ids.forEach((id, i) => $("pick").append(new Option(`${id}  ${D.trees50[i].species}`, String(i + 1)))); D.patches.forEach((p, i) => $("pick").append(new Option(`Shrub patch ${p.id}`, String(101 + i))));
+  const last = D.decades[D.decades.length - 1], worst = g => Object.entries(D.fails).filter(([k]) => k[0] === g).sort((a, b) => b[1] - a[1])[0], wj = worst("J"), wh = worst("H"), why = {}, lost = {};
+  D.deaths.forEach(x => { why[x.why] = (why[x.why] || 0) + 1; lost[x.species] = (lost[x.species] || 0) + 1; });
+  const srt = o => Object.entries(o).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(", "), canopy = D.decades.filter(d => d.year > 1).map(d => `${d.canopy}% at year ${d.year}`).join(", ");
+  $("answers").innerHTML = ""; [
+    ["1. Does it keep the habitat conditions Steller's jay needs?", `All four conditions met in ${D.jay}% of years 20 to 50`, wj[1] ? `The condition missed most often: ${D.test_label[wj[0]]} (missed in ${wj[1]} of 31 years).` : "No condition was missed in those years."],
+    ["2. Does it keep the habitat conditions Anna's hummingbird needs?", `All four conditions met in ${D.hum}% of years 20 to 50`, wh[1] ? `The condition missed most often: ${D.test_label[wh[0]]} (missed in ${wh[1]} of 31 years).` : "No condition was missed in those years."],
+    ["3. What share of the trees survives?", `${D.original} of the ${D.trees50.length} first-planted trees are alive at year 50`, `${D.est}% of plantings got through their first five years. ${last.alive} of ${D.trees50.length} plots hold a living tree at year 50, because losses are replanted while the site is under care. The yearly mortality that came out of this run is ${D.annual}% (a result of the events, not a number put in).`],
+    ["4. What habitat structure forms?", `${last.three}% of the green area has ground, shrub and tree layers together at year 50`, `Shrub patches are ${last.shrub}% covered. Conifers average ${last.conifer_h} m and the tallest tree is ${last.tallest} m.`],
+    ["5. How does canopy cover grow?", `${last.canopy}% of the green area under canopy at year 50`, `Along the way: ${canopy}.`],
+    ["6. What other plant problems appear?", D.deaths.length ? `${D.deaths.length} trees lost. By cause: ${srt(why)}` : "No trees were lost", `${D.deaths.length ? "Lost by species: " + srt(lost) + ". " : ""}Snow broke tops or branches ${D.broken} times. Invasive plants reached at most ${D.max_invaded}% of the green area.${D.removed.length ? " Management removed " + D.removed.length + " trees." : ""}`]
+  ].forEach(([q, a, p]) => $("answers").append(el("div", `<div class="q">${q}</div><div class="a">${a}</div><p>${p}</p>`, "ans")));
+  const g = k => pts.map(p => m(p, k)), me = k => D.metrics[k];
+  $("hists").innerHTML = hist(g("jay_n").map(q => q / 4), me("jay_n") / 4, "Steller's jay: share of the four conditions met in an average year", true, 0, 100) + hist(g("hum_n").map(q => q / 4), me("hum_n") / 4, "Anna's hummingbird: share of the four conditions met in an average year", true, 0, 100)
+    + hist(g("annual_mort"), me("annual_mort"), "Yearly tree mortality that came out of the run", true) + hist(g("first50"), me("first50"), "First-planted trees still alive at year 50", true)
+    + hist(g("canopy50"), me("canopy50"), "Canopy cover of the green area at year 50", true) + hist(g("three50"), me("three50"), "Green area with all three layers at year 50", true);
+  const rows = [["dry", "Dry summer", "#F2B766"], ["heat", "Heat wave", "#E9788A"], ["wind", "Wind storm", "#8CC0C6"], ["snow", "Heavy snow", "#F5F2F7"], ["budget_cut", "No care", "#9DBBBD"]]; let svg = ""; const X0 = 110, W = 900, x = y => X0 + (y - 0.5) / 50 * W;
+  for (let y = 0; y <= 50; y += 10) svg += `<line x1="${X0 + y / 50 * W}" x2="${X0 + y / 50 * W}" y1="14" y2="176" stroke="#0E4450"/><text x="${X0 + y / 50 * W}" y="190" text-anchor="middle">year ${y}</text>`;
+  rows.forEach(([k, n, c], i) => { const yy = 28 + i * 24; svg += `<text x="${X0 - 10}" y="${yy + 4}" text-anchor="end">${n}</text>`; D.timeline[k].forEach(y => svg += `<rect x="${x(y) - 7}" y="${yy - 7}" width="14" height="14" fill="${c}" opacity="0.85"><title>${n}, year ${y}</title></rect>`); });
+  const dy = 148, perY = {}; svg += `<text x="${X0 - 10}" y="${dy + 4}" text-anchor="end">Trees lost</text>`; D.deaths.forEach(q => perY[q.year] = (perY[q.year] || 0) + 1);
+  Object.entries(perY).forEach(([y, n]) => svg += `<circle cx="${x(+y)}" cy="${dy}" r="${4 + n * 2}" fill="none" stroke="#F2B766" stroke-width="2"><title>${n} lost in year ${y}</title></circle>`);
+  D.removed.forEach(q => svg += `<rect x="${x(q.year) - 5}" y="${dy - 5}" width="10" height="10" fill="none" stroke="#A6CFC3" stroke-width="2" transform="rotate(45 ${x(q.year)} ${dy})"><title>${q.id} removed (${q.why}), year ${q.year}</title></rect>`);
+  $("tl").innerHTML = svg + `<text x="${X0}" y="208">circle: tree lost (larger = more in that year)   diamond: tree removed by management</text>`;
+  tbl("deaths", [["Year", 1], ["Tree"], ["Species"], ["Cause"]], D.deaths.length ? D.deaths.map(q => `<tr><td class="n">${q.year}</td><td>${q.id}</td><td>${q.species}</td><td>${q.why}</td></tr>`) : ['<tr><td colspan="4">No trees were lost.</td></tr>']);
+  const cls = h => h === "good" ? "st-good" : (h === "stressed" ? "st-stressed" : "st-gone"), ns = t => t.health === "not standing";
+  tbl("trees", [["Plot"], ["Species at year 50"], ["Height m", 1], ["Crown m", 1], ["Age", 1], ["Health"]], D.trees50.map(t => `<tr><td>${t.id}</td><td>${t.species}</td><td class="n">${ns(t) ? "" : t.h}</td><td class="n">${ns(t) ? "" : t.w}</td><td class="n">${ns(t) ? "" : t.age}</td><td class="${cls(t.health)}">${t.removed ? "removed by management" : t.health}</td></tr>`));
+  tbl("bysp", [["Species"], ["Plots", 1], ["Good", 1], ["Stressed", 1], ["Not standing", 1], ["Mean height m", 1]], Object.entries(D.by_sp).map(([k, v]) => `<tr><td>${k}</td><td class="n">${v.n}</td><td class="n">${v.good}</td><td class="n">${v.stressed}</td><td class="n">${v.gone}</td><td class="n">${v.h ?? ""}</td></tr>`));
+  tbl("patches", [["Shrub patch"], ["Area m²", 1], ["Cover at year 50", 1]], D.patches.map(p => `<tr><td>${p.id}</td><td class="n">${p.area}</td><td class="n">${p.cover}%</td></tr>`));
+}
+</script>
+</body>
+</html>

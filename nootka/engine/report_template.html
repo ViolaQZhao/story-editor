@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nootka storyline report</title>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* One visual world on purpose (the Astral Lagoon palette of the Nootka drawings): navy ground, teal structure, mint for
+   what holds, amber for what needs attention. Layout: drawings on the left two thirds, the year's numbers beside them. */
+:root{
+  color-scheme:dark;
+  --navy:#00131E; --panel:#062430; --line:#0E4450; --teal:#4A9E9B; --mint:#A6CFC3; --paper:#F5F2F7; --warn:#F2B766; --muted:#9DBBBD;
+  --display:"Silkscreen","IBM Plex Mono",monospace; --body:"IBM Plex Sans","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--navy);color:var(--paper);font-family:var(--body);font-size:15px;line-height:1.55}
+.wrap{max-width:1320px;margin:0 auto;padding:24px 20px 60px}
+h1{font-family:var(--display);font-size:24px;margin:0 0 6px;color:var(--mint);letter-spacing:.5px;text-wrap:balance}
+h2{font-family:var(--display);font-size:14px;font-weight:400;letter-spacing:1px;color:var(--teal);text-transform:uppercase;margin:44px 0 12px}
+h3{font-size:15px;margin:0 0 4px;font-weight:600}
+p{margin:0 0 10px;max-width:72ch}
+.lede{color:#C9DADB}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:4px 10px;font-size:13px}
+.chip b{color:var(--mint);font-weight:600}
+.years{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px;align-items:center}
+.years span{color:var(--muted);font-size:13px;margin-right:6px}
+button{font:inherit;color:var(--paper);background:#0A3340;border:1px solid var(--line);border-radius:4px;padding:6px 14px;cursor:pointer;font-family:var(--display);font-size:13px}
+button:hover{border-color:var(--teal)}
+button[aria-pressed=true]{background:var(--teal);color:var(--navy);border-color:var(--teal)}
+:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+.viewer{display:grid;grid-template-columns:minmax(0,0.9fr) minmax(0,1.6fr) minmax(250px,0.8fr);gap:14px;align-items:start}
+@media (max-width:1100px){.viewer{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)} .side{grid-column:1/-1}}
+@media (max-width:700px){.viewer{grid-template-columns:1fr}}
+.viewer img{width:100%;display:block;image-rendering:pixelated;background:#041a23}
+.pick{position:relative;cursor:pointer;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.pick canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;pointer-events:none}
+.sel{border:1px solid var(--warn);border-radius:4px;padding:10px 12px;margin-bottom:12px}
+.sel select{font:inherit;color:var(--paper);background:#0A3340;border:1px solid var(--line);border-radius:4px;padding:4px 8px;width:100%;margin-bottom:8px}
+.sel dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:6px 0 0;font-size:13.5px}
+.sel dt{color:var(--muted)} .sel dd{margin:0;font-variant-numeric:tabular-nums}
+.sel ol{margin:8px 0 0;padding:0;list-style:none;font-size:13px;color:#C9DADB}
+.sel ol b{color:var(--paper);font-weight:500;display:inline-block;min-width:58px}
+.hint{color:var(--muted);font-size:13px;margin:0}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.side{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.tile{border:1px solid var(--line);border-radius:4px;padding:8px 10px}
+.tile b{display:block;font-size:22px;font-variant-numeric:tabular-nums;font-weight:600;line-height:1.2}
+.tile span{color:var(--muted);font-size:12.5px}
+.tests{display:flex;flex-direction:column;gap:5px;margin:6px 0 12px;padding:0;list-style:none}
+.tests li{display:grid;grid-template-columns:54px 1fr;gap:8px;font-size:13px;align-items:baseline}
+.pill{font-family:var(--display);font-size:11px;border-radius:3px;padding:2px 0;text-align:center}
+.ok{background:var(--mint);color:var(--navy)} .no{background:var(--warn);color:var(--navy)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px}
+.card .q{color:var(--muted);font-size:13px;margin-bottom:4px}
+.card .a{font-size:17px;font-weight:600;margin-bottom:6px;color:var(--paper)}
+.card p{font-size:14px;color:#C9DADB;margin:0}
+.hists{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px}
+figcaption{font-size:13px;color:#C9DADB;min-height:3.1em}
+svg{width:100%;height:auto;display:block}
+.bar{fill:var(--teal)} .axis{stroke:var(--line)} .me{stroke:var(--warn);stroke-width:2}
+.t{fill:var(--muted);font-size:10px;font-family:var(--body)} .tm{fill:var(--warn);font-size:10px;font-family:var(--body)}
+.rank{font-size:12.5px;color:var(--muted);margin:4px 0 0}
+.catbar{display:flex;height:30px;border-radius:4px;overflow:hidden;border:1px solid var(--line);margin:8px 0}
+.catbar div{display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--navy);min-width:0;white-space:nowrap;overflow:hidden}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:#C9DADB}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--line);padding:6px 10px 6px 0;white-space:nowrap}
+td{padding:5px 10px 5px 0;border-bottom:1px solid #0a3340;font-variant-numeric:tabular-nums}
+td.n,th.n{text-align:right}
+.st-good{color:var(--mint)} .st-stressed{color:var(--warn)} .st-gone{color:#8C9FA1}
+.two{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:24px} @media (max-width:900px){.two{grid-template-columns:1fr}}
+.notes li{margin-bottom:6px;color:#C9DADB;max-width:80ch}
+#tl text{font-family:var(--body);font-size:10px;fill:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>NOOTKA STREET FOREST SECTION: ONE STORYLINE</h1>
+  <p class="lede" id="lede"></p>
+  <div class="chips" id="design"></div>
+
+  <h2>The site every ten years</h2>
+  <div class="years" id="years"><span>Year</span></div>
+  <div class="viewer">
+    <div class="col"><div class="pick" data-v="plan"><img id="plan" alt=""><canvas></canvas></div></div>
+    <div class="col"><div class="pick" data-v="section"><img id="section" alt=""><canvas></canvas></div><div class="pick" data-v="model"><img id="model" alt=""><canvas></canvas></div></div>
+    <div class="side"><div class="sel"><label for="pick" class="hint">Click a tree or a shrub patch in any drawing, or choose one here</label>
+      <select id="pick"></select><div id="selinfo"></div></div><div id="side"></div></div>
+  </div>
+
+  <h2>Answers to the six questions, for this storyline</h2>
+  <div class="cards" id="answers"></div>
+
+  <h2>Where this storyline sits among all runs of the round</h2>
+  <p>Each chart counts all runs of round 1. The amber line is this storyline. The charts are not split by design choice; that comparison comes after the blind predictions are written.</p>
+  <div class="hists"><!--HISTS--></div>
+  <h3 style="margin-top:18px">Classes of outcome</h3>
+  <p>A run is placed by which birds have all their habitat conditions met in at least 70% of years 20 to 50.</p>
+  <div class="catbar" id="catbar"></div>
+  <div class="legend" id="catlegend"></div>
+
+  <h2>What happened, year by year</h2>
+  <div class="scroll"><svg id="tl" viewBox="0 0 1040 214" style="min-width:760px"></svg></div>
+  <div class="scroll" style="margin-top:10px"><table id="deaths"></table></div>
+
+  <h2>Year 50 in detail</h2>
+  <div class="two">
+    <div class="scroll"><table id="trees"></table></div>
+    <div><div class="scroll"><table id="bysp"></table></div><div class="scroll" style="margin-top:18px"><table id="patches"></table></div></div>
+  </div>
+
+  <h2>How to read this</h2>
+  <ul class="notes">
+    <li>One storyline is one possible future of one design. It shows what can happen, not what will.</li>
+    <li>Glade management in this version removes the deciduous tree that shades the shrub patches most, every five years, whatever its size. Real glade management is not done this way. The rule is left as it is on purpose: it shows that this kind of decision needs the designer's judgement.</li>
+    <li>No yearly mortality rate is put into the model. Each year, each tree faces the causes of that year (unwatered dry summer, heat wave, second dry summer in a row, wind storm, shade, end of lifespan) and one draw decides whether it dies. The yearly mortality reported here is counted from the result. Causes that are not modelled (pests, disease, vandalism, planting failure) would add to it.</li>
+    <li>The bird results test habitat conditions (nest trees, cover, food, flowering months). They do not count birds.</li>
+    <li>A tree is marked stressed when it has grown clearly less than it could (dry summers, shade), was broken by snow in the last three years, or is past its expected life. These thresholds are judgement and still to be reviewed.</li>
+    <li>Trees that die are replanted the next year while the site is under active care, so a tree standing at year 50 may be younger than 50.</li>
+    <li>In the section, where the crown starts on the trunk is a fixed share for now. The engine does not yet raise the crown base under shade.</li>
+    <li>Buildings are drawn for context (3 m per storey). They do not yet shade the trees in the calculation.</li>
+    <li>All drawings use 0.5 m blocks. Ground and buildings in the block model use 1 m columns.</li>
+  </ul>
+</div>
+<script>
+"use strict";
+const D = /*DATA*/;
+const $ = id => document.getElementById(id), el = (t, h) => { const e = document.createElement(t); if (h !== undefined) e.innerHTML = h; return e; };
+const yn = v => v ? "yes" : "no";
+$("lede").textContent = `Storyline ${D.id} is one of ${(D.nd * D.nf).toLocaleString()} runs in round 1 (${D.nd} designs, each met with the same ${D.nf} futures). It was picked at random (pick seed ${D.pick}). The engine chose the design; the future is 50 years of growth with random dry summers, heat, wind, snow, invasive plants and budget cuts.`;
+const plots = Object.entries(D.design.plots).map(([p, s]) => `${p} ${s.replace("Western red ", "")}`).join(", ");
+[["Cedar or Douglas-fir", plots], ["Shrub recipe", D.design.recipe], ["Winter mahonia", yn(D.design.winter)],
+ ["Red alder first", D.design.nurse ? `yes, conifers planted in year ${D.nurse_delay}` : "no, all planted together"],
+ ["Glade management", yn(D.design.thin)], ["Watering", D.design.water + " years"]].forEach(([k, v]) => $("design").append(el("div", `${k}: <b>${v}</b>`)));
+[...$("design").children].forEach(c => c.className = "chip");
+
+// ---- viewer ----
+let cur = 50;
+function show(y) {
+  cur = y; const d = D.decades.find(q => q.year === y);
+  [...$("years").querySelectorAll("button")].forEach(b => b.setAttribute("aria-pressed", +b.dataset.y === y));
+  for (const v of ["plan", "section", "model"]) { $(v).src = `img/${v}_${y}.png`; $(v).alt = `${v} of the site at year ${y}`; }
+  drawSel();
+  const ev = d.events, evs = [["dry", "dry summers"], ["heat", "heat waves"], ["wind", "wind storms"], ["snow", "heavy snow years"], ["budget_cut", "years without care"]]
+    .map(([k, n]) => `${ev[k]} ${n}`).join(", ");
+  const tests = Object.entries(d.tests).map(([k, ok]) => `<li><span class="pill ${ok ? "ok" : "no"}">${ok ? "MET" : "NOT MET"}</span><span>${D.test_label[k]}</span></li>`);
+  $("side").innerHTML = `<h3>Year ${y}</h3>
+    <div class="tiles">
+      <div class="tile"><b>${d.alive} / ${D.trees50.length}</b><span>trees standing</span></div>
+      <div class="tile"><b>${d.stressed}</b><span>of them stressed</span></div>
+      <div class="tile"><b>${d.died}</b><span>trees lost so far</span></div>
+      <div class="tile"><b>${d.canopy}%</b><span>canopy cover of green area</span></div>
+      <div class="tile"><b>${d.three}%</b><span>green area with all three layers</span></div>
+      <div class="tile"><b>${d.shrub}%</b><span>shrub patch cover</span></div>
+      <div class="tile"><b>${d.tallest} m</b><span>tallest tree</span></div>
+      <div class="tile"><b>${d.invaded}%</b><span>green area under invasive plants</span></div>
+    </div>
+    <h3>Steller's jay</h3><ul class="tests">${tests.slice(0, 4).join("")}</ul>
+    <h3>Anna's hummingbird</h3><ul class="tests">${tests.slice(4).join("")}</ul>
+    <h3>${y === 1 ? "This year" : "The ten years before"}</h3><p style="font-size:13.5px;color:#C9DADB;margin:0">${evs}.</p>`;
+}
+// ---- selecting a tree or a shrub patch ----
+let sel = 0; const maps = {};
+function idmap(v, y) {                       // pick map: one grey value per object (trees 1-32, shrub patches 101+)
+  const key = v + y; if (maps[key]) return maps[key];
+  return maps[key] = new Promise(res => { const im = new Image(); im.onload = () => { const c = document.createElement("canvas"); c.width = im.width; c.height = im.height;
+    const g = c.getContext("2d", {willReadFrequently: true}); g.drawImage(im, 0, 0); res({w: im.width, h: im.height, d: g.getImageData(0, 0, im.width, im.height).data}); };
+    im.onerror = () => res(null); im.src = `img/${v}_${y}_id.png`; });
+}
+function drawSel() {
+  document.querySelectorAll(".pick").forEach(async box => { const y = cur, m = await idmap(box.dataset.v, y); if (!m || y !== cur) return;
+    const cv = box.querySelector("canvas"); cv.width = m.w; cv.height = m.h; const g = cv.getContext("2d"), out = g.createImageData(m.w, m.h);
+    if (sel) for (let i = 0; i < m.w * m.h; i++) if (m.d[i * 4] === sel) { const x = i % m.w, yy = (i / m.w) | 0;
+      const edge = x === 0 || yy === 0 || x === m.w - 1 || yy === m.h - 1 || m.d[(i - 1) * 4] !== sel || m.d[(i + 1) * 4] !== sel || m.d[(i - m.w) * 4] !== sel || m.d[(i + m.w) * 4] !== sel;
+      out.data.set(edge ? [255, 244, 214, 255] : [242, 183, 102, 110], i * 4); }
+    g.putImageData(out, 0, 0); });
+  info();
+}
+function info() {
+  const box = $("selinfo"); if (!sel) { box.innerHTML = ""; return; }
+  const fr = D.frames[cur];
+  if (sel > 100) { const i = sel - 101, p = D.patches[i], q = fr.patches[i];
+    box.innerHTML = `<h3>Shrub patch ${p.id}, year ${cur}</h3><dl><dt>Area</dt><dd>${p.area} m²</dd><dt>Shrub cover</dt><dd>${q.cover}%</dd><dt>Tree canopy above</dt><dd>${q.canopy}%</dd><dt>Invasive plants</dt><dd>${q.inv}%</dd></dl>
+      <ol>${D.mix.map(([k, v]) => `<li><b>${v}%</b>${k}</li>`).join("")}</ol>`; return; }
+  const i = sel - 1, t = fr.trees[i], id = D.tree_ids[i], log = D.logs[id].filter(e => e[0] <= cur);
+  const state = t.health ? `<dt>Height</dt><dd>${t.h} m</dd><dt>Crown width</dt><dd>${t.w} m</dd><dt>Age</dt><dd>${t.age} years</dd><dt>Health</dt><dd class="${t.health === 2 ? "st-good" : "st-stressed"}">${t.health === 2 ? "good" : "stressed"}</dd>`
+    : `<dt>State</dt><dd class="st-gone">not standing this year</dd>`;
+  box.innerHTML = `<h3>${id}, year ${cur}</h3><dl><dt>Species</dt><dd>${D.tree_species[i]}</dd>${state}</dl>
+    <ol>${log.map(e => `<li><b>year ${e[0]}</b>${e[1]}</li>`).join("") || "<li>Not planted yet.</li>"}</ol>`;
+}
+function select(id) { sel = id; $("pick").value = String(id); drawSel(); }
+$("pick").append(new Option("Nothing selected", "0"));
+D.tree_ids.forEach((id, i) => $("pick").append(new Option(`${id}  ${D.tree_species[i]}`, String(i + 1))));
+D.patches.forEach((p, i) => $("pick").append(new Option(`Shrub patch ${p.id}`, String(101 + i))));
+$("pick").onchange = () => select(+$("pick").value);
+document.querySelectorAll(".pick").forEach(box => box.addEventListener("click", async e => { const m = await idmap(box.dataset.v, cur); if (!m) return;
+  const r = box.getBoundingClientRect(), x = Math.floor((e.clientX - r.left) / r.width * m.w), y = Math.floor((e.clientY - r.top) / r.height * m.h);
+  let hit = 0; for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) { const X = x + dx, Y = y + dy; if (X >= 0 && Y >= 0 && X < m.w && Y < m.h && m.d[(Y * m.w + X) * 4]) { hit = m.d[(Y * m.w + X) * 4]; break; } }
+  select(hit === sel ? 0 : hit); }));
+D.decades.forEach(d => { const b = el("button", String(d.year)); b.dataset.y = d.year; b.onclick = () => show(d.year); $("years").append(b); });
+document.addEventListener("keydown", e => { const ys = D.decades.map(d => d.year), i = ys.indexOf(cur);
+  if (e.key === "ArrowRight" && i < ys.length - 1) show(ys[i + 1]); if (e.key === "ArrowLeft" && i > 0) show(ys[i - 1]); });
+show(50);
+
+// ---- answers ----
+const last = D.decades[D.decades.length - 1], worst = grp => Object.entries(D.fails).filter(([k]) => k[0] === grp).sort((a, b) => b[1] - a[1])[0];
+const wj = worst("J"), wh = worst("H"), why = {};
+D.deaths.forEach(x => why[x.why] = (why[x.why] || 0) + 1);
+const whyTxt = Object.entries(why).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(", ");
+const lostSp = {}; D.deaths.forEach(x => lostSp[x.species] = (lostSp[x.species] || 0) + 1);
+const lostTxt = Object.entries(lostSp).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(", ");
+const canopy = D.decades.filter(d => d.year > 1).map(d => `${d.canopy}% at year ${d.year}`).join(", ");
+const cards = [
+  ["1. Does it keep the habitat conditions Steller's jay needs?", `All four conditions met in ${D.jay}% of years 20 to 50`,
+   wj[1] ? `The condition missed most often: ${D.test_label[wj[0]]} (missed in ${wj[1]} of 31 years).` : "No condition was missed in those years."],
+  ["2. Does it keep the habitat conditions Anna's hummingbird needs?", `All four conditions met in ${D.hum}% of years 20 to 50`,
+   wh[1] ? `The condition missed most often: ${D.test_label[wh[0]]} (missed in ${wh[1]} of 31 years).` : "No condition was missed in those years."],
+  ["3. What share of the trees survives?", `${D.original} of the ${D.trees50.length} first-planted trees are alive at year 50`,
+   `${D.est}% of plantings got through their first five years. ${last.alive} of ${D.trees50.length} plots hold a living tree at year 50, because losses are replanted while the site is under care. The yearly mortality that came out of this run is ${D.annual}% (a result of the events, not a number put in).`],
+  ["4. What habitat structure forms?", `${last.three}% of the green area has ground, shrub and tree layers together at year 50`,
+   `Shrub patches are ${last.shrub}% covered. Conifers average ${last.conifer_h} m and the tallest tree is ${last.tallest} m.`],
+  ["5. How does canopy cover grow?", `${last.canopy}% of the green area under canopy at year 50`, `Along the way: ${canopy}.`],
+  ["6. What other plant problems appear?", D.deaths.length ? `${D.deaths.length} trees lost. By cause: ${whyTxt}` : "No trees were lost",
+   `${lostTxt ? "Lost by species: " + lostTxt + ". " : ""}Snow broke tops or branches ${D.broken} times. Invasive plants reached at most ${D.max_invaded}% of the green area.`]];
+cards.forEach(([q, a, p]) => $("answers").append(Object.assign(el("div", `<div class="q">${q}</div><div class="a">${a}</div><p>${p}</p>`), {className: "card"})));
+
+// ---- classes ----
+const CC = ["#A6CFC3", "#4A9E9B", "#8CC0C6", "#F2B766"];
+D.shares.forEach((s, i) => { if (s > 0) { const b = el("div", s >= 9 ? s.toFixed(0) + "%" : ""); b.style.cssText = `width:${s}%;background:${CC[i]}`; b.title = `${D.cats[i]}: ${s}%`; $("catbar").append(b); } });
+D.cats.forEach((c, i) => $("catlegend").append(el("span", `<i style="background:${CC[i]}"></i>${c}: ${D.shares[i]}%${i === D.mycat ? " (this storyline)" : ""}`)));
+
+// ---- timeline ----
+const rows = [["dry", "Dry summer", "#F2B766"], ["heat", "Heat wave", "#E9788A"], ["wind", "Wind storm", "#8CC0C6"], ["snow", "Heavy snow", "#F5F2F7"], ["budget_cut", "No care", "#9DBBBD"]];
+let svg = "", X0 = 110, W = 900, x = y => X0 + (y - 0.5) / 50 * W;
+for (let y = 0; y <= 50; y += 10) svg += `<line x1="${X0 + y / 50 * W}" x2="${X0 + y / 50 * W}" y1="14" y2="176" stroke="#0E4450"/><text x="${X0 + y / 50 * W}" y="192" text-anchor="middle">year ${y}</text>`;
+rows.forEach(([k, n, c], i) => { const yy = 28 + i * 24; svg += `<text x="${X0 - 10}" y="${yy + 4}" text-anchor="end">${n}</text>`;
+  D.timeline[k].forEach(y => svg += `<rect x="${x(y) - 7}" y="${yy - 7}" width="14" height="14" fill="${c}" opacity="${k === "wind" && D.timeline.wind_extreme.includes(y) ? 1 : 0.8}"><title>${n}, year ${y}</title></rect>`); });
+const dy = 28 + 5 * 24; svg += `<text x="${X0 - 10}" y="${dy + 4}" text-anchor="end">Trees lost</text>`;
+const perY = {}; D.deaths.forEach(q => perY[q.year] = (perY[q.year] || 0) + 1);
+Object.entries(perY).forEach(([y, n]) => svg += `<circle cx="${x(+y)}" cy="${dy}" r="${4 + n * 2}" fill="none" stroke="#F2B766" stroke-width="2"><title>${n} lost in year ${y}</title></circle>`);
+D.removed.forEach(q => svg += `<rect x="${x(q.year) - 5}" y="${dy - 5}" width="10" height="10" fill="none" stroke="#A6CFC3" stroke-width="2" transform="rotate(45 ${x(q.year)} ${dy})"><title>${q.id} removed by glade management, year ${q.year}</title></rect>`);
+svg += `<text x="${X0}" y="206">circle: tree lost (larger = more in that year)   diamond: tree removed by glade management</text>`;
+$("tl").innerHTML = svg;
+const tbl = (id, head, body) => $(id).innerHTML = `<thead><tr>${head.map(h => `<th${h[1] ? ' class="n"' : ""}>${h[0]}</th>`).join("")}</tr></thead><tbody>${body.join("")}</tbody>`;
+tbl("deaths", [["Year", 1], ["Tree"], ["Species"], ["Cause"]], D.deaths.length ? D.deaths.map(q => `<tr><td class="n">${q.year}</td><td>${q.id}</td><td>${q.species}</td><td>${q.why}</td></tr>`) : ['<tr><td colspan="4">No trees were lost.</td></tr>']);
+const cls = h => h === "good" ? "st-good" : (h === "stressed" ? "st-stressed" : "st-gone");
+tbl("trees", [["Plot"], ["Species at year 50"], ["Height m", 1], ["Crown m", 1], ["Age", 1], ["Health"]],
+  D.trees50.map(t => `<tr><td>${t.id}</td><td>${t.species}</td><td class="n">${t.health === "not standing" ? "" : t.h}</td><td class="n">${t.health === "not standing" ? "" : t.w}</td><td class="n">${t.health === "not standing" ? "" : t.age}</td><td class="${cls(t.health)}">${t.removed ? "removed for the glade" : t.health}</td></tr>`));
+tbl("bysp", [["Species"], ["Plots", 1], ["Good", 1], ["Stressed", 1], ["Not standing", 1], ["Mean height m", 1]],
+  Object.entries(D.by_sp).map(([k, v]) => `<tr><td>${k}</td><td class="n">${v.n}</td><td class="n">${v.good}</td><td class="n">${v.stressed}</td><td class="n">${v.gone}</td><td class="n">${v.h ?? ""}</td></tr>`));
+tbl("patches", [["Shrub patch"], ["Area m²", 1], ["Cover at year 50", 1]], D.patches.map(p => `<tr><td>${p.id}</td><td class="n">${p.area}</td><td class="n">${p.cover}%</td></tr>`));
+</script>
+</body>
+</html>
